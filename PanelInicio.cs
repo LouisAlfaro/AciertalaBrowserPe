@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WebviewAlberto;
@@ -15,17 +16,22 @@ public partial class PanelInicio : Form
     private Label lblEstado;
     private ProgressBar progressBarDescarga;
 
+    // Para cancelar descargas en curso.
+    private CancellationTokenSource cancelTokenSource;
+
     public PanelInicio()
     {
         InitializeComponent();
         ConfigurarInterfaz();
     }
 
+    /// <summary>
+    /// Ajusta la interfaz: Tamaño del Form, Label para estado y ProgressBar para descargas.
+    /// </summary>
     private void ConfigurarInterfaz()
     {
-       
         this.Width = 400;
-        this.Height = 350;  
+        this.Height = 350;
 
         lblEstado = new Label
         {
@@ -49,10 +55,16 @@ public partial class PanelInicio : Form
         this.Controls.Add(progressBarDescarga);
     }
 
+    /// <summary>
+    /// Evento Load: primero descarga (si no existe) y descomprime BotonesAciertala.rar, 
+    /// luego lee la configuración y ejecuta el modo Terminal o Cajero si corresponde.
+    /// </summary>
     private async void PanelInicio_Load(object sender, EventArgs e)
     {
+        // Descarga y descomprime BotonesAciertala.rar (solo si no existe).
         await DescargarYDescomprimirBotonesAciertala();
 
+        // Carga la configuración guardada, si existe.
         settings = LeerDatos();
 
         if (settings != null && !string.IsNullOrEmpty(settings.Modo))
@@ -70,9 +82,13 @@ public partial class PanelInicio : Form
             }
         }
 
+        // Si no hay configuración, se muestra el formulario para que el usuario seleccione el modo.
         this.Show();
     }
 
+    /// <summary>
+    /// Descarga y descomprime BotonesAciertala.rar en C:\BotonesAciertala
+    /// </summary>
     private async Task DescargarYDescomprimirBotonesAciertala()
     {
         string carpetaDestino = @"C:\BotonesAciertala";
@@ -83,37 +99,67 @@ public partial class PanelInicio : Form
             Directory.CreateDirectory(carpetaDestino);
         }
 
+        // Si no existe el archivo RAR, se descarga.
         if (!File.Exists(archivoDestino))
         {
             string urlDescarga = "https://universalrace.net/download/BotonesAciertala.rar";
+
+            cancelTokenSource = new CancellationTokenSource();
+            var token = cancelTokenSource.Token;
 
             try
             {
                 using (WebClient client = new WebClient())
                 {
+                    // Evento para actualizar progreso y detectar velocidad lenta.
                     client.DownloadProgressChanged += (s, e) =>
                     {
                         this.Invoke((Action)(() =>
                         {
                             progressBarDescarga.Value = e.ProgressPercentage;
                             lblEstado.Text = $"Descargando BotonesAciertala.rar... {e.ProgressPercentage}%";
+
+                            // Detectar si la velocidad es menor a ~100 KB/s
+                            if (e.BytesReceived > 0 && e.TotalBytesToReceive > 0 && e.ProgressPercentage > 0)
+                            {
+                                double kbReceived = e.BytesReceived / 1024.0;
+                                // Se asume que e.ProgressPercentage va de 1 a 100
+                                double velocidadKBps = kbReceived / e.ProgressPercentage;
+                                if (velocidadKBps < 100)
+                                {
+                                    lblEstado.Text = "Internet lento. Verifique su conexión.";
+                                }
+                            }
                         }));
                     };
 
+                    // Inicio de la descarga
                     this.Invoke((Action)(() =>
                     {
                         lblEstado.Text = "Iniciando descarga de BotonesAciertala.rar...";
                         progressBarDescarga.Value = 0;
                     }));
 
+                    // Descargar el archivo
                     await client.DownloadFileTaskAsync(new Uri(urlDescarga), archivoDestino);
 
+                    // Al finalizar la descarga
                     this.Invoke((Action)(() =>
                     {
                         lblEstado.Text = "Descarga completada. Descomprimiendo...";
                         progressBarDescarga.Value = 100;
                     }));
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Si se canceló la descarga, se borran los archivos parciales
+                BorrarDescarga(archivoDestino);
+                this.Invoke((Action)(() =>
+                {
+                    lblEstado.Text = "Descarga cancelada.";
+                }));
+                return;
             }
             catch (Exception ex)
             {
@@ -122,12 +168,17 @@ public partial class PanelInicio : Form
             }
         }
 
+        // Verificar que el archivo exista realmente
         if (!File.Exists(archivoDestino))
         {
             MessageBox.Show("El archivo BotonesAciertala.rar no se encuentra después de la descarga.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
 
+        // Descomprimir RAR (si lo deseas realmente). 
+        // Actualmente tu código sólo descarga BotonesAciertala.rar y no la descomprime con UnRAR.
+        // Si quieres usar unrar, descomenta y ajusta la ruta:
+        
         try
         {
             DescomprimirRAR(archivoDestino, carpetaDestino);
@@ -140,9 +191,12 @@ public partial class PanelInicio : Form
         {
             MessageBox.Show($"Error al descomprimir BotonesAciertala.rar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+        
     }
 
-
+    /// <summary>
+    /// Método para descomprimir un RAR usando UnRAR.exe
+    /// </summary>
     private void DescomprimirRAR(string archivoRar, string carpetaDestino)
     {
         if (!File.Exists(archivoRar))
@@ -150,7 +204,8 @@ public partial class PanelInicio : Form
             throw new Exception("El archivo RAR no existe, no se puede descomprimir.");
         }
 
-        string unrarPath = @"C:\Program Files\WinRAR\UnRAR.exe"; 
+        // Ajusta la ruta a UnRAR.exe según tu instalación de WinRAR
+        string unrarPath = @"C:\Program Files\WinRAR\UnRAR.exe";
 
         if (!File.Exists(unrarPath))
         {
@@ -161,7 +216,7 @@ public partial class PanelInicio : Form
         {
             ProcessStartInfo psi = new ProcessStartInfo
             {
-                FileName = unrarPath, 
+                FileName = unrarPath,
                 Arguments = $"x \"{archivoRar}\" \"{carpetaDestino}\\\" -y",
                 WindowStyle = ProcessWindowStyle.Hidden,
                 CreateNoWindow = true
@@ -178,7 +233,46 @@ public partial class PanelInicio : Form
         }
     }
 
+    /// <summary>
+    /// Cancela la descarga y borra el archivo parcial si existe.
+    /// </summary>
+    private void BorrarDescarga(string archivo)
+    {
+        try
+        {
+            if (File.Exists(archivo))
+            {
+                File.Delete(archivo);
+            }
 
+            string carpeta = Path.GetDirectoryName(archivo);
+            if (Directory.Exists(carpeta))
+            {
+                // Si quieres borrar la carpeta entera
+                // Directory.Delete(carpeta, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al eliminar archivos: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    /// <summary>
+    /// Botón Cancelar: cierra la ventana y, si hay una descarga en curso, la cancela.
+    /// </summary>
+    private void BtnCancelar_Click(object sender, EventArgs e)
+    {
+        if (cancelTokenSource != null)
+        {
+            cancelTokenSource.Cancel();
+        }
+        this.Close();
+    }
+
+    /// <summary>
+    /// Descarga y descomprime Aciertala-setup-2.7.2.zip, luego ejecuta la aplicación si no existe en la carpeta local.
+    /// </summary>
     private async void EjecutarAciertala()
     {
         string appFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aciertala");
@@ -188,15 +282,19 @@ public partial class PanelInicio : Form
 
         this.Invoke((Action)(() => lblEstado.Text = "Verificando aplicación..."));
 
+        // Comprueba si Aciertala.exe ya está descargado
         string appPath = Directory.Exists(appFolderPath)
                             ? Directory.GetFiles(appFolderPath, "*.exe", SearchOption.AllDirectories).FirstOrDefault()
                             : null;
 
+        // Si no está, se descarga y descomprime
         if (string.IsNullOrEmpty(appPath) || !File.Exists(appPath))
         {
             this.Invoke((Action)(() => lblEstado.Text = "Descargando nueva versión..."));
+
             await DescargarYDescomprimir(downloadUrl, zipFilePath, extractPath);
 
+            // Tras la descompresión, busca el .exe
             appPath = Directory.Exists(extractPath)
                         ? Directory.GetFiles(extractPath, "*.exe", SearchOption.AllDirectories).FirstOrDefault()
                         : null;
@@ -207,6 +305,7 @@ public partial class PanelInicio : Form
                 return;
             }
 
+            // Copia el EXE a la carpeta local
             try
             {
                 if (!Directory.Exists(appFolderPath))
@@ -223,6 +322,7 @@ public partial class PanelInicio : Form
             }
         }
 
+        // Ejecutar la aplicación
         try
         {
             this.Invoke((Action)(() => lblEstado.Text = "Ejecutando aplicación..."));
@@ -249,10 +349,17 @@ public partial class PanelInicio : Form
         }
     }
 
+    /// <summary>
+    /// Método auxiliar para descargar y descomprimir Aciertala (ZIP)
+    /// </summary>
     private async Task DescargarYDescomprimir(string url, string destinoZip, string destinoExtract)
     {
         try
         {
+            // Para cancelar la descarga en caso necesario
+            cancelTokenSource = new CancellationTokenSource();
+            var token = cancelTokenSource.Token;
+
             using (WebClient client = new WebClient())
             {
                 client.DownloadProgressChanged += (s, e) =>
@@ -261,6 +368,17 @@ public partial class PanelInicio : Form
                     {
                         progressBarDescarga.Value = e.ProgressPercentage;
                         lblEstado.Text = $"Descargando... {e.ProgressPercentage}%";
+
+                        // Detectar baja velocidad de internet
+                        if (e.BytesReceived > 0 && e.TotalBytesToReceive > 0 && e.ProgressPercentage > 0)
+                        {
+                            double kbReceived = e.BytesReceived / 1024.0;
+                            double velocidadKBps = kbReceived / e.ProgressPercentage;
+                            if (velocidadKBps < 100)
+                            {
+                                lblEstado.Text = "Internet lento. Verifique su conexión.";
+                            }
+                        }
                     }));
                 };
 
@@ -280,6 +398,7 @@ public partial class PanelInicio : Form
                         progressBarDescarga.Value = 100;
                     }));
 
+                    // Eliminar carpeta previa si existe
                     if (Directory.Exists(destinoExtract))
                     {
                         Directory.Delete(destinoExtract, true);
@@ -299,18 +418,24 @@ public partial class PanelInicio : Form
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Borra el archivo parcial si se canceló
+            BorrarDescarga(destinoZip);
+            this.Invoke((Action)(() =>
+            {
+                lblEstado.Text = "Descarga cancelada.";
+            }));
+        }
         catch (Exception ex)
         {
             this.Invoke((Action)(() => lblEstado.Text = $"Error: {ex.Message}"));
         }
     }
 
-    private void BtnCancelar_Click(object sender, EventArgs e)
-    {
-        this.Close();
-    }
-
-
+    /// <summary>
+    /// Ejecuta el modo Cajero: busca "VBOX.appref-ms" en el Escritorio
+    /// </summary>
     private void EjecutarAplicacionCajero()
     {
         string appFileName = "VBOX.appref-ms";
@@ -342,6 +467,9 @@ public partial class PanelInicio : Form
         }
     }
 
+    /// <summary>
+    /// Evento para TextBox: al entrar, si tiene texto por defecto, lo limpia
+    /// </summary>
     private void Txt_Enter(object sender, EventArgs e)
     {
         if (sender is TextBox txt)
@@ -354,6 +482,9 @@ public partial class PanelInicio : Form
         }
     }
 
+    /// <summary>
+    /// Evento para TextBox: al salir, si está vacío, le pone el texto por defecto
+    /// </summary>
     private void Txt_Leave(object sender, EventArgs e)
     {
         if (sender is TextBox txt)
@@ -373,6 +504,9 @@ public partial class PanelInicio : Form
         }
     }
 
+    /// <summary>
+    /// Cuando el usuario completa el panel y da Aceptar, se guarda la configuración y se ejecuta según el modo
+    /// </summary>
     private void BtnAceptar_Click(object sender, EventArgs e)
     {
         string urlRegistro = txtUrlRegistro.Text;
@@ -405,6 +539,9 @@ public partial class PanelInicio : Form
         }
     }
 
+    /// <summary>
+    /// Guarda la configuración en JSON en LocalApplicationData\AciertalaApp\config.json
+    /// </summary>
     private void GuardarDatos(AppSettings settings)
     {
         try
@@ -426,12 +563,14 @@ public partial class PanelInicio : Form
         }
     }
 
+    /// <summary>
+    /// Lee la configuración desde config.json
+    /// </summary>
     private AppSettings LeerDatos()
     {
         try
         {
             string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AciertalaApp", "config.json");
-
             if (File.Exists(filePath))
             {
                 string json = File.ReadAllText(filePath);
@@ -442,6 +581,9 @@ public partial class PanelInicio : Form
         return null;
     }
 
+    /// <summary>
+    /// Clase con la configuración del aplicativo
+    /// </summary>
     public class AppSettings
     {
         public string UrlRegistro { get; set; }

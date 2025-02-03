@@ -11,17 +11,34 @@ namespace WebviewAlberto
 {
     public partial class Form2 : Form
     {
+        // APIs nativas para registrar/desregistrar HotKeys
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        private const int WM_HOTKEY = 0x0312;
+        private const uint MOD_NONE = 0x0000; // Sin modificadores
+
+        // Para arrastrar la ventana
+        [DllImport("user32.dll")]
+        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+        [DllImport("user32.dll")]
+        public static extern bool ReleaseCapture();
+
         private Panel panelLateral;
         private Panel panelBotonesContainer;
         private FlowLayoutPanel panelBotones;
         private Button btnHome;
-        private Button btnCerrar;
         private bool botonesVisibles = false;
         private int alturaBotones = 0;
 
         public Form2()
         {
             InitializeComponent();
+
+            // Configurar formulario
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.Manual;
             this.TopMost = true;
@@ -29,65 +46,65 @@ namespace WebviewAlberto
             this.Size = new Size(182, 60);
             this.DoubleBuffered = true;
             this.MouseDown += Form2_MouseDown;
-            this.KeyPreview = true;
 
-            var workingArea = Screen.PrimaryScreen.WorkingArea;
-
-
-            int x = workingArea.X + 1400;
-            int y = workingArea.Y + 5;
-            this.Location = new Point(x, y);
+            // Registrar hotkeys globales
+            RegistrarHotKeys();
 
             GenerarInterfaz();
             GenerarBotones();
             CalcularAlturaBotones();
 
+            // Ubicar en la parte superior/derecha de la pantalla
             PosicionarArribaDerecha();
 
-
+            // Manejar cambio de resolución/preferencias
             SystemEvents.DisplaySettingsChanged += (s, e) => PosicionarArribaDerecha();
             SystemEvents.UserPreferenceChanged += (s, e) => PosicionarArribaDerecha();
-
         }
 
-        private void PosicionarArribaDerecha()
+        // Registrar las teclas F5, F6, F11 como hotkeys globales
+        private void RegistrarHotKeys()
         {
-            Rectangle wa = Screen.PrimaryScreen.WorkingArea;
-            int screenWidth = wa.Width; // Usamos el ancho del área de trabajo
-
-            // Valores por defecto (para pantallas grandes)
-            int offsetDerecha = 250;
-            int offsetArriba = 10;
-
-            // Ajusta según el tamaño de la pantalla
-            if (screenWidth < 1280)
-            {
-                offsetDerecha = 300; // Pantallas pequeñas (ej: 1280x720)
-            }
-            if (screenWidth <= 1440)
-            {
-                offsetDerecha = 280; // Pantallas medianas (ej: 1440x900)
-            }
-            // Si screenWidth >= 1440, mantiene el valor por defecto (360)
-
-            // Calcula la posición
-            int x = wa.Right - this.Width - offsetDerecha;
-            int y = wa.Top + offsetArriba;
-
-            // Asegura que no se salga de los límites
-            x = Math.Max(x, wa.Left);
-            y = Math.Max(y, wa.Top);
-
-            this.Location = new Point(x, y);
+            // F5 → ID 1
+            RegisterHotKey(this.Handle, 1, MOD_NONE, (uint)Keys.F5);
+            // F6 → ID 2
+            RegisterHotKey(this.Handle, 2, MOD_NONE, (uint)Keys.F6);
+            // F11 → ID 3
+            RegisterHotKey(this.Handle, 3, MOD_NONE, (uint)Keys.F11);
         }
 
+        // Al cerrar el formulario, desregistrar los hotkeys para no dejar basura en el sistema
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+            UnregisterHotKey(this.Handle, 1); // F5
+            UnregisterHotKey(this.Handle, 2); // F6
+            UnregisterHotKey(this.Handle, 3); // F11
+        }
 
+        // Interceptar mensajes de Windows
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
 
-        [DllImport("user32.dll")]
-        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
-        [DllImport("user32.dll")]
-        public static extern bool ReleaseCapture();
+            if (m.Msg == WM_HOTKEY)
+            {
+                switch ((int)m.WParam)
+                {
+                    case 1: // F5
+                        ReiniciarAciertalaGlobal();
+                        break;
+                    case 2: // F6
+                        EjecutarProgramaGlobal(@"C:\BotonesAciertala\BotonF6.exe");
+                        break;
+                    case 3: // F11
+                        EjecutarProgramaGlobal(@"C:\BotonesAciertala\BotonF11.exe");
+                        break;
+                }
+            }
+        }
 
+        // Mueve la ventana cuando se arrastra con el mouse
         private void Form2_MouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
@@ -97,9 +114,39 @@ namespace WebviewAlberto
             }
         }
 
+        // Colocar la ventana en la parte superior derecha según la resolución
+        private void PosicionarArribaDerecha()
+        {
+            Rectangle wa = Screen.PrimaryScreen.WorkingArea;
+            int screenWidth = wa.Width;
+
+            // Valores por defecto
+            int offsetDerecha = 250;
+            int offsetArriba = 10;
+
+            // Ajustar offsetDerecha según la resolución
+            if (screenWidth < 1280)
+            {
+                offsetDerecha = 300;
+            }
+            else if (screenWidth <= 1440)
+            {
+                offsetDerecha = 280;
+            }
+
+            int x = wa.Right - this.Width - offsetDerecha;
+            int y = wa.Top + offsetArriba;
+
+            // Evitar que se salga de límites
+            x = Math.Max(x, wa.Left);
+            y = Math.Max(y, wa.Top);
+
+            this.Location = new Point(x, y);
+        }
+
+        // Crear el panel lateral y el botón "HOME"
         private void GenerarInterfaz()
         {
-
             panelLateral = new Panel
             {
                 Width = 220,
@@ -108,7 +155,6 @@ namespace WebviewAlberto
                 Padding = new Padding(0)
             };
             this.Controls.Add(panelLateral);
-
 
             panelBotonesContainer = new Panel
             {
@@ -122,7 +168,6 @@ namespace WebviewAlberto
             };
             panelLateral.Controls.Add(panelBotonesContainer);
 
-
             panelBotones = new FlowLayoutPanel
             {
                 FlowDirection = FlowDirection.TopDown,
@@ -134,7 +179,6 @@ namespace WebviewAlberto
                 Dock = DockStyle.Fill
             };
             panelBotonesContainer.Controls.Add(panelBotones);
-
 
             btnHome = new Button
             {
@@ -159,54 +203,27 @@ namespace WebviewAlberto
                 btnHome.ImageAlign = ContentAlignment.MiddleLeft;
             }
 
-
             btnHome.Click += ToggleBotones;
             panelLateral.Controls.Add(btnHome);
-
-
-            //btnCerrar = new Button
-            //{
-            //    Text = " Cerrar",
-            //    Dock = DockStyle.Bottom,
-            //    Height = 60,
-            //    BackColor = Color.Red,
-            //    ForeColor = Color.White,
-            //    FlatStyle = FlatStyle.Flat,
-            //    TextAlign = ContentAlignment.MiddleLeft,
-            //    TextImageRelation = TextImageRelation.ImageBeforeText,
-            //    Font = new Font("Segoe UI", 14, FontStyle.Bold),
-            //    ImageAlign = ContentAlignment.MiddleLeft,
-            //    Padding = new Padding(15, 0, 0, 0),
-            //    FlatAppearance = { BorderSize = 2, BorderColor = Color.Blue },
-            //    Margin = new Padding(0, 10, 0, 0)
-            //};
-
-            //if (File.Exists("icons/close.png"))
-            //{
-            //    btnCerrar.Image = new Bitmap("icons/close.png");
-            //    btnCerrar.ImageAlign = ContentAlignment.MiddleLeft;
-            //}
-
-            //btnCerrar.Click += (s, e) => Application.Exit();
-            //panelLateral.Controls.Add(btnCerrar);
         }
 
+        // Generar el listado de botones en el menú
         private void GenerarBotones()
         {
             ButtonConfig[] buttonConfigs = new ButtonConfig[]
             {
-         new ButtonConfig("CABALLOS", "icons/Caballos.png", (s, e) => AbrirPagina("https://retailhorse.aciertala.com/")),
-         new ButtonConfig("ADMIN GOLDEN", "icons/lives.png", (s, e) => AbrirPagina("https://statsinfo.co/live/1/")),
-         new ButtonConfig("SHEETS", "icons/scores.png", (s, e) => AbrirPagina("https://statshub.sportradar.com/novusoft/es/sport/1")),
-         new ButtonConfig("CASHIER ONLINE", "icons/register.png", (s, e) => AbrirPagina("https://statsinfo.co/stats/1/c/26/")),
-         new ButtonConfig("CHROME", "icons/browser.png", (s, e) => AbrirPagina("https://www.google.com/")),
-         new ButtonConfig("WHATSAPP", "icons/wsp.png", (s, e) => AbrirPagina("https://365livesport.org/")),
-         new ButtonConfig("CHAT SOPORTE", "icons/chat.png", (s, e) => AbrirPagina("https://www.registro.com/")),
-         new ButtonConfig("TIPOS DE APUESTAS", "icons/bets.png", (s, e) => AbrirTiposApuestas()),
-         new ButtonConfig("UTILITARIOS", "icons/utilitarios.png", (s, e) => RestartAciertala()),
-         new ButtonConfig("CONEXIÓN REMOTA", "icons/remote.png", (s, e) => AbrirPagina("https://www.google.com/")),
-         new ButtonConfig("ACTUALIZAR", "icons/update.png", (s, e) => OpenApagarReiniciarForm()),
-         new ButtonConfig("APAGAR / REINICIAR", "icons/power.png", (s, e) => OpenApagarReiniciarForm())
+                new ButtonConfig("CABALLOS", "icons/Caballos.png", (s, e) => AbrirPagina("https://retailhorse.aciertala.com/")),
+                new ButtonConfig("ADMIN GOLDEN", "icons/lives.png", (s, e) => AbrirPagina("https://statsinfo.co/live/1/")),
+                new ButtonConfig("SHEETS", "icons/scores.png", (s, e) => AbrirPagina("https://statshub.sportradar.com/novusoft/es/sport/1")),
+                new ButtonConfig("CASHIER ONLINE", "icons/register.png", (s, e) => AbrirPagina("https://statsinfo.co/stats/1/c/26/")),
+                new ButtonConfig("CHROME", "icons/browser.png", (s, e) => AbrirPagina("https://www.google.com/")),
+                new ButtonConfig("WHATSAPP", "icons/wsp.png", (s, e) => AbrirPagina("https://365livesport.org/")),
+                new ButtonConfig("CHAT SOPORTE", "icons/chat.png", (s, e) => AbrirPagina("https://www.registro.com/")),
+                new ButtonConfig("TIPOS DE APUESTAS", "icons/bets.png", (s, e) => AbrirTiposApuestas()),
+                new ButtonConfig("UTILITARIOS", "icons/utilitarios.png", (s, e) => RestartAciertala()),
+                new ButtonConfig("CONEXIÓN REMOTA", "icons/remote.png", (s, e) => AbrirPagina("https://www.google.com/")),
+                new ButtonConfig("ACTUALIZAR", "icons/update.png", (s, e) => OpenApagarReiniciarForm()),
+                new ButtonConfig("APAGAR / REINICIAR", "icons/power.png", (s, e) => OpenApagarReiniciarForm())
             };
 
             foreach (var config in buttonConfigs)
@@ -235,96 +252,11 @@ namespace WebviewAlberto
                 }
 
                 btn.Click += config.EventoClick;
-
                 panelBotones.Controls.Add(btn);
             }
         }
 
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-        {
-            switch (keyData)
-            {
-                case Keys.F11:
-                    EjecutarPrograma(@"C:\BotonesAciertala\BotonF11.exe");
-                    return true;
-
-                case Keys.F6:
-                    EjecutarPrograma(@"C:\BotonesAciertala\BotonF6.exe");
-                    return true;
-
-                case Keys.F5:
-                    ReiniciarAciertala();
-                    return true;
-
-                default:
-                    return base.ProcessCmdKey(ref msg, keyData);
-            }
-        }
-
-        private void EjecutarPrograma(string ruta)
-        {
-            if (File.Exists(ruta))
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = ruta,
-                    UseShellExecute = true
-                });
-            }
-            else
-            {
-                MessageBox.Show($"No se encontró el archivo:\n{ruta}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void ReiniciarAciertala()
-        {
-            string aciertalaPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aciertala", "Aciertala.exe");
-
-            if (File.Exists(aciertalaPath))
-            {
-                try
-                {
-             
-                    foreach (var proceso in Process.GetProcessesByName("Aciertala"))
-                    {
-                        proceso.Kill();
-                    }
-
-                    System.Threading.Thread.Sleep(1000);
-
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = aciertalaPath,
-                        UseShellExecute = true
-                    });
-
-
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error al reiniciar Aciértala:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-            else
-            {
-                MessageBox.Show("No se encontró Aciértala.exe.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-
-        private void DibujarBotonHome(object sender, PaintEventArgs e)
-        {
-            Button btn = sender as Button;
-            Graphics g = e.Graphics;
-            Rectangle rect = new Rectangle(0, 0, btn.Width, btn.Height);
-            LinearGradientBrush gradient = new LinearGradientBrush(rect, Color.Blue, Color.DarkBlue, LinearGradientMode.Vertical);
-
-            g.FillRectangle(gradient, rect);
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.DrawRectangle(new Pen(ColorTranslator.FromHtml("#1A24B1"), 5), rect);
-
-        }
+        // Alterna el panel de botones visible o no
         private void ToggleBotones(object sender, EventArgs e)
         {
             botonesVisibles = !botonesVisibles;
@@ -342,18 +274,82 @@ namespace WebviewAlberto
             }
         }
 
-
-        private void AbrirTerminalLogin() => MessageBox.Show("Abriendo Terminal Login...");
-        private void AbrirTiposApuestas() => MessageBox.Show("Abriendo Tipos de Apuestas...");
-        private void RestartAciertala() => MessageBox.Show("Reiniciando Aciértala...");
-        private void OpenApagarReiniciarForm() => MessageBox.Show("Apagar/Reiniciar...");
-        private void AbrirPagina(string url) => Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        // Calcula la altura total de los botones para expandir o colapsar
         private void CalcularAlturaBotones()
         {
             alturaBotones = 0;
             foreach (Control control in panelBotones.Controls)
             {
                 alturaBotones += control.Height + control.Margin.Bottom;
+            }
+        }
+
+        // MÉTODOS COMPLEMENTARIOS:
+        private void AbrirPagina(string url)
+        {
+            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+
+        private void AbrirTiposApuestas()
+        {
+            MessageBox.Show("Abriendo Tipos de Apuestas...");
+        }
+
+        private void RestartAciertala()
+        {
+            MessageBox.Show("Reiniciando Aciértala...");
+        }
+
+        private void OpenApagarReiniciarForm()
+        {
+            MessageBox.Show("Apagar/Reiniciar...");
+        }
+
+        // Hotkeys Globales: Lógica
+        private void ReiniciarAciertalaGlobal()
+        {
+            // Versión global de reiniciar aciertala
+            string aciertalaPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aciertala", "Aciertala.exe");
+            if (File.Exists(aciertalaPath))
+            {
+                try
+                {
+                    foreach (var proceso in Process.GetProcessesByName("Aciertala"))
+                    {
+                        proceso.Kill();
+                    }
+
+                    System.Threading.Thread.Sleep(1000);
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = aciertalaPath,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al reiniciar Aciértala:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No se encontró Aciértala.exe.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void EjecutarProgramaGlobal(string ruta)
+        {
+            if (File.Exists(ruta))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = ruta,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                MessageBox.Show($"No se encontró el archivo:\n{ruta}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

@@ -11,11 +11,19 @@ namespace WebviewAlberto
 {
     public partial class Form1 : Form
     {
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        private const int WM_HOTKEY = 0x0312;
+        private const uint MOD_NONE = 0x0000;  // Sin modificadores
+
         private Panel panelLateral;
         private Panel panelBotonesContainer;
         private FlowLayoutPanel panelBotones;
         private Button btnHome;
-        private Button btnCerrar;
         private bool botonesVisibles = false;
         private int alturaBotones = 0;
 
@@ -31,28 +39,114 @@ namespace WebviewAlberto
             this.MouseDown += Form1_MouseDown;
             this.KeyPreview = true;
 
-            var workingArea = Screen.PrimaryScreen.WorkingArea;
-
-
             GenerarInterfaz();
             GenerarBotones();
             CalcularAlturaBotones();
             PosicionarArribaDerecha();
 
+            // Registrar HotKeys globales
+            RegistrarHotKeys();
 
+            // Eventos del sistema
             SystemEvents.DisplaySettingsChanged += (s, e) => PosicionarArribaDerecha();
             SystemEvents.UserPreferenceChanged += (s, e) => PosicionarArribaDerecha();
         }
+
+        private void RegistrarHotKeys()
+        {
+            // F5 → ID 1
+            RegisterHotKey(this.Handle, 1, MOD_NONE, (uint)Keys.F5);
+            // F6 → ID 2
+            RegisterHotKey(this.Handle, 2, MOD_NONE, (uint)Keys.F6);
+            // F11 → ID 3
+            RegisterHotKey(this.Handle, 3, MOD_NONE, (uint)Keys.F11);
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+            // Liberar las hotkeys
+            UnregisterHotKey(this.Handle, 1);
+            UnregisterHotKey(this.Handle, 2);
+            UnregisterHotKey(this.Handle, 3);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+
+            if (m.Msg == WM_HOTKEY)
+            {
+                switch ((int)m.WParam)
+                {
+                    case 1: // F5
+                        ReiniciarAciertalaGlobal();
+                        break;
+                    case 2: // F6
+                        EjecutarProgramaGlobal(@"C:\BotonesAciertala\BotonF6.exe");
+                        break;
+                    case 3: // F11
+                        EjecutarProgramaGlobal(@"C:\BotonesAciertala\BotonF11.exe");
+                        break;
+                }
+            }
+        }
+
+        private void ReiniciarAciertalaGlobal()
+        {
+            string aciertalaPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aciertala", "Aciertala.exe");
+            if (File.Exists(aciertalaPath))
+            {
+                try
+                {
+                    foreach (var proceso in Process.GetProcessesByName("Aciertala"))
+                    {
+                        proceso.Kill();
+                    }
+                    System.Threading.Thread.Sleep(1000);
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = aciertalaPath,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error al reiniciar Aciértala:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No se encontró Aciértala.exe.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void EjecutarProgramaGlobal(string ruta)
+        {
+            if (File.Exists(ruta))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = ruta,
+                    UseShellExecute = true
+                });
+            }
+            else
+            {
+                MessageBox.Show($"No se encontró el archivo:\n{ruta}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // Resto de tu código (PosicionarArribaDerecha, GenerarInterfaz, etc.)
+        // ------------------------------------------------------------------
 
         private void PosicionarArribaDerecha()
         {
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
             int screenWidth = wa.Width;
 
-
             int offsetDerecha = 360;
             int offsetArriba = 10;
-
 
             if (screenWidth < 1280)
             {
@@ -66,17 +160,15 @@ namespace WebviewAlberto
             int x = wa.Right - this.Width - offsetDerecha;
             int y = wa.Top + offsetArriba;
 
-            // Asegura que no se salga de los límites
             x = Math.Max(x, wa.Left);
             y = Math.Max(y, wa.Top);
 
             this.Location = new Point(x, y);
         }
 
-
-
         [DllImport("user32.dll")]
         public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
         [DllImport("user32.dll")]
         public static extern bool ReleaseCapture();
 
@@ -91,7 +183,6 @@ namespace WebviewAlberto
 
         private void GenerarInterfaz()
         {
-
             panelLateral = new Panel
             {
                 Width = 220,
@@ -101,7 +192,6 @@ namespace WebviewAlberto
             };
             this.Controls.Add(panelLateral);
 
-
             panelBotonesContainer = new Panel
             {
                 Width = 200,
@@ -110,14 +200,12 @@ namespace WebviewAlberto
                 Padding = new Padding(0),
                 Margin = new Padding(0),
                 BackColor = ColorTranslator.FromHtml("#313439"),
-                Visible = botonesVisibles
+                Visible = false
             };
             panelLateral.Controls.Add(panelBotonesContainer);
 
-
             panelBotones = new FlowLayoutPanel
             {
-
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
                 BackColor = ColorTranslator.FromHtml("#313439"),
@@ -127,7 +215,6 @@ namespace WebviewAlberto
                 Dock = DockStyle.Fill
             };
             panelBotonesContainer.Controls.Add(panelBotones);
-
 
             btnHome = new Button
             {
@@ -152,12 +239,8 @@ namespace WebviewAlberto
                 btnHome.ImageAlign = ContentAlignment.MiddleLeft;
             }
 
-
             btnHome.Click += ToggleBotones;
             panelLateral.Controls.Add(btnHome);
-
-
-
         }
 
         private void GenerarBotones()
@@ -174,10 +257,10 @@ namespace WebviewAlberto
             new ButtonConfig("CHROME", "icons/browser.png", (s, e) => AbrirPagina("https://www.google.com/")),
             new ButtonConfig("REGISTRO", "icons/register.png", (s, e) => AbrirPagina("https://www.registro.com/")),
             new ButtonConfig("REGISTRO QR", "icons/register.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
-            new ButtonConfig("TIPOS DE APUESTAS", "icons/bets.png", (s, e) => AbrirTiposApuestas()),
-            new ButtonConfig("ACTUALIZAR", "icons/update.png", (s, e) => RestartAciertala()),
+            new ButtonConfig("TIPOS DE APUESTAS", "icons/bets.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
+            new ButtonConfig("ACTUALIZAR", "icons/update.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
             new ButtonConfig("CONEXIÓN REMOTA", "icons/remote.png", (s, e) => AbrirPagina("https://www.google.com/")),
-            new ButtonConfig("APAGAR / REINICIAR", "icons/power.png", (s, e) => OpenApagarReiniciarForm())
+            new ButtonConfig("APAGAR / REINICIAR", "icons/power.png", (s, e) => AbrirPagina("https://www.configuracion.com/"))
             };
 
             foreach (var config in buttonConfigs)
@@ -211,91 +294,6 @@ namespace WebviewAlberto
             }
         }
 
-
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-        {
-            switch (keyData)
-            {
-                case Keys.F11:
-                    EjecutarPrograma(@"C:\BotonesAciertala\BotonF11.exe");
-                    return true;
-
-                case Keys.F6:
-                    EjecutarPrograma(@"C:\BotonesAciertala\BotonF6.exe");
-                    return true;
-
-                case Keys.F5:
-                    ReiniciarAciertala();
-                    return true;
-
-                default:
-                    return base.ProcessCmdKey(ref msg, keyData);
-            }
-        }
-
-        private void EjecutarPrograma(string ruta)
-        {
-            if (File.Exists(ruta))
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = ruta,
-                    UseShellExecute = true
-                });
-            }
-            else
-            {
-                MessageBox.Show($"No se encontró el archivo:\n{ruta}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-     
-        private void ReiniciarAciertala()
-        {
-            string aciertalaPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aciertala", "Aciertala.exe");
-
-            if (File.Exists(aciertalaPath))
-            {
-                try
-                {
-                    foreach (var proceso in Process.GetProcessesByName("Aciertala"))
-                    {
-                        proceso.Kill();
-                    }
-
-                    System.Threading.Thread.Sleep(1000);
-
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = aciertalaPath,
-                        UseShellExecute = true
-                    });
-
-                    
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error al reiniciar Aciértala:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-            else
-            {
-                MessageBox.Show("No se encontró Aciértala.exe.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-    
-        private void DibujarBotonHome(object sender, PaintEventArgs e)
-        {
-            Button btn = sender as Button;
-            Graphics g = e.Graphics;
-            Rectangle rect = new Rectangle(0, 0, btn.Width, btn.Height);
-            LinearGradientBrush gradient = new LinearGradientBrush(rect, Color.Blue, Color.DarkBlue, LinearGradientMode.Vertical);
-
-            g.FillRectangle(gradient, rect);
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.DrawRectangle(new Pen(ColorTranslator.FromHtml("#1A24B1"), 5), rect);
-
-        }
         private void ToggleBotones(object sender, EventArgs e)
         {
             botonesVisibles = !botonesVisibles;
@@ -306,7 +304,6 @@ namespace WebviewAlberto
                 panelBotonesContainer.Height = alturaBotones;
                 this.Height += alturaBotones;
             }
-
             else
             {
                 panelBotonesContainer.Height = 0;
@@ -314,17 +311,21 @@ namespace WebviewAlberto
             }
         }
 
-
         private void AbrirTerminalLogin()
         {
-            // Abre el formulario TerminalLogin
             TerminalLogin form = new TerminalLogin();
             form.Show();
         }
-        private void AbrirTiposApuestas() => MessageBox.Show("Abriendo Tipos de Apuestas...");
-        private void RestartAciertala() => MessageBox.Show("Reiniciando Aciértala...");
-        private void OpenApagarReiniciarForm() => MessageBox.Show("Apagar/Reiniciar...");
-        private void AbrirPagina(string url) => Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+
+        private void AbrirPagina(string url)
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+
         private void CalcularAlturaBotones()
         {
             alturaBotones = 0;
@@ -335,4 +336,3 @@ namespace WebviewAlberto
         }
     }
 }
-

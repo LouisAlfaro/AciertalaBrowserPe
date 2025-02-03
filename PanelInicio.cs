@@ -15,8 +15,8 @@ public partial class PanelInicio : Form
     private AppSettings settings;
     private Label lblEstado;
     private ProgressBar progressBarDescarga;
+    private CheckBox chkMostrarJuegos; 
 
-    // Para cancelar descargas en curso.
     private CancellationTokenSource cancelTokenSource;
 
     public PanelInicio()
@@ -26,7 +26,8 @@ public partial class PanelInicio : Form
     }
 
     /// <summary>
-    /// Ajusta la interfaz: Tamaño del Form, Label para estado y ProgressBar para descargas.
+    /// Ajusta la interfaz: Tamaño del Form, Label para estado, ProgressBar para descargas,
+    /// y un CheckBox (chkMostrarJuegos).
     /// </summary>
     private void ConfigurarInterfaz()
     {
@@ -53,6 +54,34 @@ public partial class PanelInicio : Form
             Value = 0
         };
         this.Controls.Add(progressBarDescarga);
+
+        // Agregamos el CheckBox al formulario
+        chkMostrarJuegos = new CheckBox
+        {
+            Text = "Mostrar Juegos Virtuales",
+            AutoSize = true,
+            Location = new System.Drawing.Point((this.Width - 160) / 2, 220),
+            ForeColor = System.Drawing.Color.Black
+        };
+        chkMostrarJuegos.CheckedChanged += ChkMostrarJuegos_CheckedChanged;
+        this.Controls.Add(chkMostrarJuegos);
+    }
+
+    /// <summary>
+    /// Evento que se dispara cuando el usuario marca o desmarca el CheckBox.
+    /// Actualmente solo muestra un MessageBox de ejemplo.
+    /// Ajusta este código según tu lógica deseada.
+    /// </summary>
+    private void ChkMostrarJuegos_CheckedChanged(object sender, EventArgs e)
+    {
+        if (chkMostrarJuegos.Checked)
+        {
+            MessageBox.Show("Juegos Virtuales: ACTIVADO");
+        }
+        else
+        {
+            MessageBox.Show("Juegos Virtuales: DESACTIVADO");
+        }
     }
 
     /// <summary>
@@ -178,7 +207,7 @@ public partial class PanelInicio : Form
         // Descomprimir RAR (si lo deseas realmente). 
         // Actualmente tu código sólo descarga BotonesAciertala.rar y no la descomprime con UnRAR.
         // Si quieres usar unrar, descomenta y ajusta la ruta:
-        
+
         try
         {
             DescomprimirRAR(archivoDestino, carpetaDestino);
@@ -191,7 +220,6 @@ public partial class PanelInicio : Form
         {
             MessageBox.Show($"Error al descomprimir BotonesAciertala.rar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        
     }
 
     /// <summary>

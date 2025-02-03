@@ -11,6 +11,7 @@ namespace WebviewAlberto
 {
     public partial class Form1 : Form
     {
+        // ========== HOTKEYS GLOBALES ==========
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
@@ -20,16 +21,21 @@ namespace WebviewAlberto
         private const int WM_HOTKEY = 0x0312;
         private const uint MOD_NONE = 0x0000;  // Sin modificadores
 
+        // ========== CAMPOS DEL FORMULARIO ==========
         private Panel panelLateral;
         private Panel panelBotonesContainer;
         private FlowLayoutPanel panelBotones;
         private Button btnHome;
+        private CheckBox chkMostrarAlgo; // <--- CheckBox agregado de ejemplo
+
         private bool botonesVisibles = false;
         private int alturaBotones = 0;
 
         public Form1()
         {
             InitializeComponent();
+
+            // Configuración del formulario
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.Manual;
             this.TopMost = true;
@@ -39,6 +45,7 @@ namespace WebviewAlberto
             this.MouseDown += Form1_MouseDown;
             this.KeyPreview = true;
 
+            // Generar interfaz y botones
             GenerarInterfaz();
             GenerarBotones();
             CalcularAlturaBotones();
@@ -47,11 +54,12 @@ namespace WebviewAlberto
             // Registrar HotKeys globales
             RegistrarHotKeys();
 
-            // Eventos del sistema
+            // Eventos del sistema (cambio de resolución, etc.)
             SystemEvents.DisplaySettingsChanged += (s, e) => PosicionarArribaDerecha();
             SystemEvents.UserPreferenceChanged += (s, e) => PosicionarArribaDerecha();
         }
 
+        // ========== REGISTRAR HOTKEYS ==========
         private void RegistrarHotKeys()
         {
             // F5 → ID 1
@@ -65,12 +73,13 @@ namespace WebviewAlberto
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
-            // Liberar las hotkeys
+            // Liberar las hotkeys al cerrar
             UnregisterHotKey(this.Handle, 1);
             UnregisterHotKey(this.Handle, 2);
             UnregisterHotKey(this.Handle, 3);
         }
 
+        // ========== PROCESAR MENSAJES (WM_HOTKEY) ==========
         protected override void WndProc(ref Message m)
         {
             base.WndProc(ref m);
@@ -92,6 +101,7 @@ namespace WebviewAlberto
             }
         }
 
+        // ========== LÓGICA DE REINICIO / EJECUCIÓN ==========
         private void ReiniciarAciertalaGlobal()
         {
             string aciertalaPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aciertala", "Aciertala.exe");
@@ -137,9 +147,7 @@ namespace WebviewAlberto
             }
         }
 
-        // Resto de tu código (PosicionarArribaDerecha, GenerarInterfaz, etc.)
-        // ------------------------------------------------------------------
-
+        // ========== POSICIONAR VENTANA EN LA PARTE SUPERIOR DERECHA ==========
         private void PosicionarArribaDerecha()
         {
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
@@ -166,6 +174,7 @@ namespace WebviewAlberto
             this.Location = new Point(x, y);
         }
 
+        // ========== PERMITIR ARRASTRAR LA VENTANA SIN BORDE ==========
         [DllImport("user32.dll")]
         public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
 
@@ -181,8 +190,10 @@ namespace WebviewAlberto
             }
         }
 
+        // ========== GENERAR INTERFAZ (Panel Lateral, CheckBox, etc.) ==========
         private void GenerarInterfaz()
         {
+            // Panel Lateral
             panelLateral = new Panel
             {
                 Width = 220,
@@ -192,6 +203,7 @@ namespace WebviewAlberto
             };
             this.Controls.Add(panelLateral);
 
+            // Panel que contendrá los botones
             panelBotonesContainer = new Panel
             {
                 Width = 200,
@@ -204,6 +216,7 @@ namespace WebviewAlberto
             };
             panelLateral.Controls.Add(panelBotonesContainer);
 
+            // FlowLayoutPanel para los botones
             panelBotones = new FlowLayoutPanel
             {
                 FlowDirection = FlowDirection.TopDown,
@@ -216,6 +229,7 @@ namespace WebviewAlberto
             };
             panelBotonesContainer.Controls.Add(panelBotones);
 
+            // Botón HOME (para mostrar/ocultar botones)
             btnHome = new Button
             {
                 Text = " HOME V1.0",
@@ -241,26 +255,45 @@ namespace WebviewAlberto
 
             btnHome.Click += ToggleBotones;
             panelLateral.Controls.Add(btnHome);
+
+            // EJEMPLO de CheckBox en Form1 (opcional):
+            chkMostrarAlgo = new CheckBox
+            {
+                Text = "Mostrar algo",
+                ForeColor = Color.White,
+                BackColor = ColorTranslator.FromHtml("#313439"),
+                AutoSize = true,
+                Location = new Point(10, 70)
+            };
+            chkMostrarAlgo.CheckedChanged += (s, e) =>
+            {
+                if (chkMostrarAlgo.Checked)
+                    MessageBox.Show("CheckBox ACTIVADO en Form1.");
+                else
+                    MessageBox.Show("CheckBox DESACTIVADO en Form1.");
+            };
+            panelLateral.Controls.Add(chkMostrarAlgo);
         }
 
+        // ========== GENERAR BOTONES (Terminal Login, Caballos, etc.) ==========
         private void GenerarBotones()
         {
             ButtonConfig[] buttonConfigs = new ButtonConfig[]
-{
-            new ButtonConfig("TERMINAL LOGIN", "icons/WEB.png", (s, e) => AbrirTerminalLogin()),
-            new ButtonConfig("CABALLOS", "icons/Caballos.png", (s, e) => AbrirPagina("https://retailhorse.aciertala.com/")),
-            new ButtonConfig("JUEGOS VIRTUALES", "icons/Caballos.png", (s, e) => AbrirPagina("https://retailhorse.aciertala.com/")),
-            new ButtonConfig("RESULTADO EN VIVO", "icons/lives.png", (s, e) => AbrirPagina("https://statsinfo.co/live/1/")),
-            new ButtonConfig("MARCADORES EN VIVO", "icons/scores.png", (s, e) => AbrirPagina("https://statshub.sportradar.com/novusoft/es/sport/1")),
-            new ButtonConfig("ESTADISTICA", "icons/stats.png", (s, e) => AbrirPagina("https://statsinfo.co/stats/1/c/26/")),
-            new ButtonConfig("TRANSMISIÓN", "icons/stream.png", (s, e) => AbrirPagina("https://365livesport.org/")),
-            new ButtonConfig("CHROME", "icons/browser.png", (s, e) => AbrirPagina("https://www.google.com/")),
-            new ButtonConfig("REGISTRO", "icons/register.png", (s, e) => AbrirPagina("https://www.registro.com/")),
-            new ButtonConfig("REGISTRO QR", "icons/register.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
-            new ButtonConfig("TIPOS DE APUESTAS", "icons/bets.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
-            new ButtonConfig("ACTUALIZAR", "icons/update.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
-            new ButtonConfig("CONEXIÓN REMOTA", "icons/remote.png", (s, e) => AbrirPagina("https://www.google.com/")),
-            new ButtonConfig("APAGAR / REINICIAR", "icons/power.png", (s, e) => AbrirPagina("https://www.configuracion.com/"))
+            {
+                new ButtonConfig("TERMINAL LOGIN", "icons/WEB.png", (s, e) => AbrirTerminalLogin()),
+                new ButtonConfig("CABALLOS", "icons/Caballos.png", (s, e) => AbrirPagina("https://retailhorse.aciertala.com/")),
+                new ButtonConfig("JUEGOS VIRTUALES", "icons/Caballos.png", (s, e) => AbrirPagina("https://retailhorse.aciertala.com/")),
+                new ButtonConfig("RESULTADO EN VIVO", "icons/lives.png", (s, e) => AbrirPagina("https://statsinfo.co/live/1/")),
+                new ButtonConfig("MARCADORES EN VIVO", "icons/scores.png", (s, e) => AbrirPagina("https://statshub.sportradar.com/novusoft/es/sport/1")),
+                new ButtonConfig("ESTADISTICA", "icons/stats.png", (s, e) => AbrirPagina("https://statsinfo.co/stats/1/c/26/")),
+                new ButtonConfig("TRANSMISIÓN", "icons/stream.png", (s, e) => AbrirPagina("https://365livesport.org/")),
+                new ButtonConfig("CHROME", "icons/browser.png", (s, e) => AbrirPagina("https://www.google.com/")),
+                new ButtonConfig("REGISTRO", "icons/register.png", (s, e) => AbrirPagina("https://www.registro.com/")),
+                new ButtonConfig("REGISTRO QR", "icons/register.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
+                new ButtonConfig("TIPOS DE APUESTAS", "icons/bets.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
+                new ButtonConfig("ACTUALIZAR", "icons/update.png", (s, e) => AbrirPagina("https://www.configuracion.com/")),
+                new ButtonConfig("CONEXIÓN REMOTA", "icons/remote.png", (s, e) => AbrirPagina("https://www.google.com/")),
+                new ButtonConfig("APAGAR / REINICIAR", "icons/power.png", (s, e) => AbrirPagina("https://www.configuracion.com/"))
             };
 
             foreach (var config in buttonConfigs)
@@ -294,6 +327,7 @@ namespace WebviewAlberto
             }
         }
 
+        // ========== MOSTRAR / OCULTAR BOTONES ==========
         private void ToggleBotones(object sender, EventArgs e)
         {
             botonesVisibles = !botonesVisibles;
@@ -311,6 +345,7 @@ namespace WebviewAlberto
             }
         }
 
+        // ========== LÓGICA ADICIONAL ==========
         private void AbrirTerminalLogin()
         {
             TerminalLogin form = new TerminalLogin();

@@ -1,0 +1,15 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="WebviewAlberto.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="PrinterName" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="LogoPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Logo/LogoAciertala</Value>
+    </Setting>
+    <Setting Name="PaperSize" Type="System.String" Scope="User">
+      <Value Profile="(Default)">80mm</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

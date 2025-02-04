@@ -26,7 +26,9 @@ namespace WebviewAlberto
         private Panel panelBotonesContainer;
         private FlowLayoutPanel panelBotones;
         private Button btnHome;
-        private CheckBox chkMostrarAlgo; // <--- CheckBox agregado de ejemplo
+        private CheckBox chkMostrarAlgo;
+        private Button btnJuegosVirtuales;
+       
 
         private bool botonesVisibles = false;
         private int alturaBotones = 0;
@@ -323,7 +325,20 @@ namespace WebviewAlberto
 
                 btn.Click += config.EventoClick;
 
+                if (config.Texto == "JUEGOS VIRTUALES")
+                {
+                    btnJuegosVirtuales = btn;
+                }
+
                 panelBotones.Controls.Add(btn);
+            }
+        }
+
+        public void MostrarJuegosVirtuales(bool mostrar)
+        {
+            if (btnJuegosVirtuales != null)
+            {
+                btnJuegosVirtuales.Visible = mostrar;
             }
         }
 

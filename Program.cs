@@ -15,29 +15,30 @@ namespace WebviewAlberto
 
             
             AppSettings settings = LeerDatos();
+            Form1 form1 = new Form1(); 
+
 
             if (settings != null)
             {
                 switch (settings.Modo)
                 {
                     case "Terminal":
-                        Application.Run(new PanelInicio());
+                        Application.Run(new PanelInicio(form1));
                        
                         break;
 
                     case "Cajero":
-                        Application.Run(new PanelInicio());
-                        
+                        Application.Run(new PanelInicio(form1));
                         break;
 
                     default:
-                        Application.Run(new PanelInicio());
+                        Application.Run(new PanelInicio(form1));
                         break;
                 }
             }
             else
             {
-                Application.Run(new PanelInicio()); 
+                Application.Run(new PanelInicio(form1)); 
             }
         }
 
@@ -67,5 +68,6 @@ namespace WebviewAlberto
         public string UrlRegistro { get; set; }
         public string LinkQR { get; set; }
         public string Modo { get; set; }
+        public bool MostrarJuegos { get; set; } = true;
     }
 }

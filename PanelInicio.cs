@@ -15,13 +15,17 @@ public partial class PanelInicio : Form
     private AppSettings settings;
     private Label lblEstado;
     private ProgressBar progressBarDescarga;
-    private CheckBox chkMostrarJuegos; 
+    private CheckBox chkMostrarJuegos;
+    private Form1 form1;
+   
 
     private CancellationTokenSource cancelTokenSource;
 
-    public PanelInicio()
+    public PanelInicio(Form1 form1)
     {
         InitializeComponent();
+        settings = LeerDatos() ?? new AppSettings();
+        this.form1 = form1;
         ConfigurarInterfaz();
     }
 
@@ -61,7 +65,9 @@ public partial class PanelInicio : Form
             Text = "Mostrar Juegos Virtuales",
             AutoSize = true,
             Location = new System.Drawing.Point((this.Width - 160) / 2, 220),
-            ForeColor = System.Drawing.Color.Black
+            ForeColor = System.Drawing.Color.Black,
+            Checked = settings?.MostrarJuegos ?? true // 🔹 Asegura que si es null, sea `true`
+
         };
         chkMostrarJuegos.CheckedChanged += ChkMostrarJuegos_CheckedChanged;
         this.Controls.Add(chkMostrarJuegos);
@@ -74,16 +80,15 @@ public partial class PanelInicio : Form
     /// </summary>
     private void ChkMostrarJuegos_CheckedChanged(object sender, EventArgs e)
     {
-        if (chkMostrarJuegos.Checked)
+        if (form1 != null)
         {
-            MessageBox.Show("Juegos Virtuales: ACTIVADO");
+            form1.MostrarJuegosVirtuales(chkMostrarJuegos.Checked); // 🔹 Actualizar la visibilidad en Form1
         }
-        else
-        {
-            MessageBox.Show("Juegos Virtuales: DESACTIVADO");
-        }
-    }
 
+        // 🔹 Guardar el estado del checkbox en el archivo JSON
+        settings.MostrarJuegos = chkMostrarJuegos.Checked;
+        GuardarDatos(settings);
+    }
     /// <summary>
     /// Evento Load: primero descarga (si no existe) y descomprime BotonesAciertala.rar, 
     /// luego lee la configuración y ejecuta el modo Terminal o Cajero si corresponde.
@@ -617,5 +622,7 @@ public partial class PanelInicio : Form
         public string UrlRegistro { get; set; }
         public string LinkQR { get; set; }
         public string Modo { get; set; }
+
+        public bool MostrarJuegos { get; set; } = true;
     }
 }
